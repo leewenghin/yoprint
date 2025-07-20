@@ -69,6 +69,28 @@ class productImport implements ToModel, WithHeadingRow, ShouldQueue, WithChunkRe
     }
 
     /**
+     * Clean non-UTF-8 characters from a string or array
+     */
+    private function cleanUtf8($data)
+    {
+        if (is_array($data)) {
+            return array_map([$this, 'cleanUtf8'], $data);
+        }
+
+        if (is_string($data)) {
+            // Remove or replace non-UTF-8 characters
+            $cleaned = mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+            // Remove any remaining invalid UTF-8 sequences
+            $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $cleaned);
+            // Remove null bytes and other control characters that might cause issues
+            $cleaned = str_replace(["\0", "\x0B"], '', $cleaned);
+            return trim($cleaned);
+        }
+
+        return $data;
+    }
+
+    /**
      * Register events for the import
      */
     public function registerEvents(): array
@@ -170,6 +192,9 @@ class productImport implements ToModel, WithHeadingRow, ShouldQueue, WithChunkRe
                 'pms_color'                      => $row['pms_color'] ?? null,
                 'gtin'                           => $row['gtin'] ?? null,
             ];
+
+            // Clean all string data to ensure UTF-8 compatibility
+            $data = $this->cleanUtf8($data);
 
             // Skip rows without unique_key
             if (empty($data['unique_key'])) {
